@@ -16,8 +16,7 @@ import {
   History
 } from 'lucide-react';
 import { FORTUNE_STICKS, FortuneStick } from './constants';
-import { interpretFortune } from './services/geminiService';
-//import { interpretFortune } from './src';
+import { interpretFortune, isAIEnabled } from './services/geminiService';
 
 // Audio URLs (Publicly available or placeholders)
 const SOUNDS = {
@@ -84,7 +83,7 @@ export default function App() {
       setBlockResult(result);
 
       if (result === 'DIVINE') {
-        fetchInterpretation();
+        setState('RESULT');
       } else {
         // Wait a bit then let user retry or reshake
         setTimeout(() => {
@@ -102,11 +101,18 @@ export default function App() {
   const fetchInterpretation = async () => {
     if (!currentStick) return;
     setIsLoading(true);
-    const result = await interpretFortune(currentStick, question, category);
-    setInterpretation(result);
-    setHistory(prev => [{ stick: currentStick, interpretation: result, date: new Date().toLocaleString() }, ...prev]);
-    setIsLoading(false);
-    setState('RESULT');
+    try {
+      const result = await interpretFortune(currentStick, question, category);
+      setInterpretation(result);
+      setHistory(prev => [{ stick: currentStick, interpretation: result, date: new Date().toLocaleString() }, ...prev]);
+      setState('RESULT');
+    } catch (error) {
+      console.error("Interpretation Error:", error);
+      setInterpretation("大師目前感應中斷，請確認 API 金鑰是否設定正確。");
+      setState('RESULT');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const reset = () => {
@@ -384,28 +390,21 @@ export default function App() {
                 </h3>
 
                 <p className="text-[#f5e6d3]/80">
-                  {blockResult === 'DIVINE' && '神明已確認此籤，正在為您解惑...'}
+                  {blockResult === 'DIVINE' && '神明已確認此籤，請查看結果。'}
                   {blockResult === 'LAUGH' && '神明笑而不語，或您問得不夠清楚，請重新求籤。'}
                   {blockResult === 'ANGRY' && '神明不認同此籤，或時機未到，請重新求籤。'}
                 </p>
 
                 {blockResult === 'DIVINE' ? (
-                  isLoading ? (
-                    <div className="flex flex-col items-center gap-4 py-4">
-                      <div className="w-8 h-8 border-4 border-[#d4af37] border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-sm text-[#d4af37]/60">大師正在感應籤詩...</p>
-                    </div>
-                  ) : (
-                    <button 
-                      onClick={() => {
-                        setBlockResult(null);
-                        setState('RESULT');
-                      }}
-                      className="w-full py-4 bg-[#d4af37] text-[#1a0f0f] font-bold rounded-xl hover:shadow-[0_0_15px_rgba(212,175,55,0.4)] transition-all"
-                    >
-                      查看大師解籤
-                    </button>
-                  )
+                  <button 
+                    onClick={() => {
+                      setBlockResult(null);
+                      setState('RESULT');
+                    }}
+                    className="w-full py-4 bg-[#d4af37] text-[#1a0f0f] font-bold rounded-xl hover:shadow-[0_0_15px_rgba(212,175,55,0.4)] transition-all"
+                  >
+                    查看籤詩結果
+                  </button>
                 ) : (
                   <button 
                     onClick={() => {
@@ -427,7 +426,7 @@ export default function App() {
             </motion.div>
           )}
 
-          {state === 'RESULT' && currentStick && interpretation && (
+          {state === 'RESULT' && currentStick && (
             <motion.div 
               key="result"
               initial={{ opacity: 0 }}
@@ -453,14 +452,49 @@ export default function App() {
                   </p>
                 </div>
 
-                <div className="space-y-6">
-                  <div className="flex items-center gap-2 text-[#d4af37]">
-                    <MessageSquare className="w-5 h-5" />
-                    <h3 className="font-bold">大師解籤</h3>
+                {/* Traditional Meaning */}
+                <div className="bg-[#1a0f0f] p-6 rounded-2xl border border-[#d4af37]/10 relative">
+                  <div className="absolute -top-3 left-6 px-2 bg-[#2a1a1a] text-xs text-[#d4af37]/60">傳統籤解</div>
+                  <p className="text-xl text-[#f5e6d3] font-bold">
+                    {currentStick.meaning}
+                  </p>
+                </div>
+
+                {/* AI Section */}
+                <div className="space-y-6 border-t border-[#d4af37]/20 pt-8">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-[#d4af37]">
+                      <Sparkles className="w-5 h-5" />
+                      <h3 className="font-bold">AI 大師深層解讀</h3>
+                    </div>
                   </div>
-                  <div className="prose prose-invert max-w-none text-[#f5e6d3]/90 leading-relaxed whitespace-pre-wrap">
-                    {interpretation}
-                  </div>
+                  
+                  {interpretation ? (
+                    <div className="prose prose-invert max-w-none text-[#f5e6d3]/90 leading-relaxed whitespace-pre-wrap">
+                      {interpretation}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      {isAIEnabled() ? (
+                        <button 
+                          onClick={fetchInterpretation}
+                          disabled={isLoading}
+                          className="px-8 py-3 bg-[#8b0000] text-white rounded-full border border-[#d4af37]/50 hover:bg-[#a00000] transition-all flex items-center gap-2 mx-auto disabled:opacity-50"
+                        >
+                          {isLoading ? (
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          ) : (
+                            <MessageSquare className="w-4 h-4" />
+                          )}
+                          {isLoading ? '感應中...' : '請示 AI 大師'}
+                        </button>
+                      ) : (
+                        <p className="text-[#f5e6d3]/40 text-sm italic">
+                          (目前為離線模式，設定 API 金鑰後可開啟 AI 解籤功能)
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <button 

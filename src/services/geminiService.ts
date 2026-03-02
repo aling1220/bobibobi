@@ -1,12 +1,24 @@
 import { GoogleGenAI } from "@google/genai";
 import { FortuneStick } from "../constants";
 
+export const isAIEnabled = (): boolean => {
+  const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+  return !!(apiKey && apiKey !== "undefined" && apiKey !== "" && apiKey !== "MY_GEMINI_API_KEY");
+};
+
 export async function interpretFortune(
   stick: FortuneStick,
   question: string,
   category: string
 ): Promise<string> {
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  // Try to get API key from multiple sources
+  const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+  
+  if (!apiKey || apiKey === "undefined" || apiKey === "" || apiKey === "MY_GEMINI_API_KEY") {
+    throw new Error("Missing Gemini API Key.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   const model = "gemini-3-flash-preview";
 
   const prompt = `
