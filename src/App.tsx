@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { FORTUNE_STICKS, FortuneStick } from './constants';
 import { interpretFortune } from './services/geminiService';
+//import { interpretFortune } from './src';
 
 // Audio URLs (Publicly available or placeholders)
 const SOUNDS = {
